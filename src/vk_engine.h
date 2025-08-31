@@ -1,10 +1,13 @@
-#ifndef VULKAN_ENGINE_H
-#define VULKAN_ENGINE_H
+#ifndef VK_ENGINE_H
+#define VK_ENGINE_H
 
 #include <vulkan/vulkan.h>
 #include <vector>
 
-struct FrameData {
+constexpr unsigned int FRAME_OVERLAP = 2;
+
+struct FrameData
+{
     VkSemaphore _swapchainSemaphore, _renderSemaphore;
     VkFence _renderFence;
 
@@ -12,51 +15,48 @@ struct FrameData {
     VkCommandBuffer _mainCommandBuffer;
 };
 
-constexpr unsigned int FRAME_OVERLAP = 2;
-
 class VulkanEngine
 {
 public:
-    struct SDL_Window* _window{nullptr};
-    bool _stop_rendering{false};
-    bool _is_initialized{false};
-
-public:
     void init();
-    void draw();
     void run();
+    void draw();
     void cleanup();
 
-private:
-    void init_vulkan();
-    void init_swapchain();
-    void init_commands();
-    void init_sync_structures();
+protected:
+    struct SDL_Window* _window{nullptr};
+    VkExtent2D _windowExtent{1700u, 900u};
 
     VkInstance _instance;
-    VkDebugUtilsMessengerEXT _debug_messenger;
     VkPhysicalDevice _chosenGPU;
     VkDevice _device;
     VkSurfaceKHR _surface;
+    VkDebugUtilsMessengerEXT _debug_messenger;
 
-    void create_swapchain(uint32_t width, uint32_t height);
-    void destroy_swapchain();
     VkSwapchainKHR _swapchain;
     VkFormat _swapchainImageFormat;
     std::vector<VkImage> _swapchainImages;
     std::vector<VkImageView> _swapchainImageViews;
     VkExtent2D _swapchainExtent;
 
-    uint32_t _width = 1700;
-    uint32_t _height = 900;
-
-
-    FrameData& get_current_frame() { return _frames[_frameNumber % FRAME_OVERLAP]; };
+    FrameData& get_current_frame() { return _frames[STATE._frameNumber % FRAME_OVERLAP]; };
     FrameData _frames[FRAME_OVERLAP];
-    int _frameNumber{0};
     VkQueue _graphicsQueue;
     uint32_t _graphicsQueueFamily;
+
+    struct
+    {
+        int _frameNumber = 0;
+        bool initialized = false;
+    } STATE;
+
+private:
+    void _init_sdl_window();
+    void _init_vulkan();
+    void _init_swapchain();
+    void _init_commands();
+    void _init_sync_structures();
 };
 
 
-#endif //VULKAN_ENGINE_H
+#endif //VK_ENGINE_H
