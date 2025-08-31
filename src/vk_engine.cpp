@@ -465,13 +465,13 @@ void VulkanEngine::_init_pipelines()
 
     //> comp_pipeline_multi
     VkShaderModule gradientShader;
-    if (!vkutil::load_shader_module("../shaders/gradient_color.comp.spv", _device, &gradientShader))
+    if (!vkutil::load_shader_module("./shaders/gradient_color.comp.spv", _device, &gradientShader))
     {
         throw std::runtime_error("Error when building the compute shader \n");
     }
 
     VkShaderModule skyShader;
-    if (!vkutil::load_shader_module("../shaders/sky.comp.spv", _device, &skyShader))
+    if (!vkutil::load_shader_module("./shaders/sky.comp.spv", _device, &skyShader))
     {
         throw std::runtime_error("Error when building the compute shader \n");
     }

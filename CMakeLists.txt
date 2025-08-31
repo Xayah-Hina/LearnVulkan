@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.26)
 project(LearnVulkan)
 
+include(cmake/compile_shaders.cmake)
 include(cmake/setup_glm.cmake)
 include(cmake/setup_imgui.cmake)
 include(cmake/setup_sdl3.cmake)
