@@ -16,6 +16,10 @@ set(src_files
         src/vk_initializers.h
         src/vk_images.cpp
         src/vk_images.h
+        src/vk_descriptors.cpp
+        src/vk_descriptors.h
+        src/vk_pipelines.cpp
+        src/vk_pipelines.h
 )
 set(VulkanAppName "LearnVulkan")
 add_executable(${VulkanAppName}
@@ -24,7 +28,7 @@ add_executable(${VulkanAppName}
         ${src_files}
 )
 target_compile_features(${VulkanAppName} PRIVATE cxx_std_20)
-target_link_libraries(${VulkanAppName} PRIVATE Vulkan::Vulkan SDL3::SDL3 glm stb_image GPUOpen::VulkanMemoryAllocator)
+target_link_libraries(${VulkanAppName} PRIVATE Vulkan::Vulkan SDL3::SDL3 glm stb_image imgui GPUOpen::VulkanMemoryAllocator)
 target_include_directories(${VulkanAppName} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 if (MSVC)
     target_compile_options(${VulkanAppName} PRIVATE /W4 /permissive- /Zc:preprocessor)
