@@ -22,7 +22,7 @@ set(src_files
         src/vk_pipelines.cpp
         src/vk_pipelines.h
 )
-set(VulkanAppName "LearnVulkan")
+set(VulkanAppName "vulkan_app")
 add_executable(${VulkanAppName}
         main.cpp
         ${vkbootstrap_files}

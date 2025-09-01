@@ -28,4 +28,4 @@ foreach(GLSL ${GLSL_SOURCE_FILES})
     list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach()
 
-add_custom_target(Shaders ALL DEPENDS ${SPIRV_BINARY_FILES})
+add_custom_target(compile_shaders ALL DEPENDS ${SPIRV_BINARY_FILES})

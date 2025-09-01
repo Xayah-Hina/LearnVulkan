@@ -1,17 +1,38 @@
 #ifndef VK_ENGINE_H
 #define VK_ENGINE_H
 
-#include "vk_mem_alloc.h"
 #include "vk_descriptors.h"
+#include "vk_mem_alloc.h"
 #include <vulkan/vulkan.h>
-#include <vector>
+#include <glm/vec4.hpp>
+#include <memory>
+#include <string>
 #include <deque>
 #include <functional>
-#include <glm/mat4x4.hpp>
-#include <glm/vec4.hpp>
+
 constexpr unsigned int FRAME_OVERLAP = 2;
 
-// ================================================================
+struct DeletionQueue
+{
+    std::deque<std::function<void()>> deleters;
+
+    void push_function(std::function<void()>&& function)
+    {
+        deleters.push_back(function);
+    }
+
+    void flush()
+    {
+        // reverse iterate the deletion queue to execute all the functions
+        for (auto it = deleters.rbegin(); it != deleters.rend(); it++)
+        {
+            (*it)(); //call functors
+        }
+
+        deleters.clear();
+    }
+};
+
 struct AllocatedImage
 {
     VkImage image;
@@ -21,38 +42,15 @@ struct AllocatedImage
     VkFormat imageFormat;
 };
 
-// ===============================================================
-
-struct DeletionQueue
-{
-    std::deque<std::function<void()>> deletors;
-
-    void push_function(std::function<void()>&& function)
-    {
-        deletors.push_back(function);
-    }
-
-    void flush()
-    {
-        // reverse iterate the deletion queue to execute all the functions
-        for (auto it = deletors.rbegin(); it != deletors.rend(); it++)
-        {
-            (*it)(); //call functors
-        }
-
-        deletors.clear();
-    }
-};
-
 struct FrameData
 {
-    VkSemaphore _swapchainSemaphore, _renderSemaphore;
-    VkFence _renderFence;
+    VkSemaphore swapchainSemaphore, renderSemaphore;
+    VkFence renderFence;
 
-    VkCommandPool _commandPool;
-    VkCommandBuffer _mainCommandBuffer;
+    VkCommandPool commandPool;
+    VkCommandBuffer mainCommandBuffer;
 
-    DeletionQueue _deletionQueue;
+    DeletionQueue deletionQueue;
 };
 
 struct ComputePushConstants
@@ -76,47 +74,58 @@ struct ComputeEffect
 class VulkanEngine
 {
 public:
+    VulkanEngine();
+    ~VulkanEngine();
+
+public:
     void init();
-    void run();
-    void draw();
     void cleanup();
+    void run();
 
 protected:
-    void draw_background(VkCommandBuffer cmd);
-    void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
-
-protected:
-    struct SDL_Window* _window{nullptr};
-    VkExtent2D _windowExtent{1700u, 900u};
-
-    VkInstance _instance;
-    VkDebugUtilsMessengerEXT _debug_messenger;
-    VkPhysicalDevice _chosenGPU;
-    VkDevice _device;
-
-    VkSurfaceKHR _surface;
-    VkSwapchainKHR _swapchain;
-    VkFormat _swapchainImageFormat;
-    VkExtent2D _swapchainExtent;
-
-    std::vector<VkFramebuffer> _framebuffers;
-    std::vector<VkImage> _swapchainImages;
-    std::vector<VkImageView> _swapchainImageViews;
-
-    FrameData& get_current_frame() { return _frames[STATE._frameNumber % FRAME_OVERLAP]; };
-    FrameData _frames[FRAME_OVERLAP];
-    VkQueue _graphicsQueue;
-    uint32_t _graphicsQueueFamily;
-
     struct
     {
-        int currentBackgroundEffect = 0;
-        int _frameNumber = 0;
-        bool initialized = false;
+        std::string name = "Vulkan Engine";
+        int width = 1700;
+        int height = 800;
+        bool initialized{false};
+        bool running{false};
+        bool should_rendering{false};
+
+        int frame_number{0};
+        int current_background_effect{1};
     } STATE;
 
-    DeletionQueue _mainDeletionQueue;
-    VmaAllocator _allocator;
+    void draw();
+
+private:
+    struct EngineContext
+    {
+        struct SDL_Window* window{nullptr};
+        VkSurfaceKHR surface{};
+        VkInstance instance{};
+        VkDebugUtilsMessengerEXT debug_messenger{};
+        VkPhysicalDevice physical{};
+        VkDevice device{};
+        VkQueue graphics_queue{};
+        uint32_t graphics_queue_family{};
+        VmaAllocator allocator{};
+    };
+
+    struct SwapchainSystem
+    {
+        VkSwapchainKHR swapchain{};
+        VkFormat swapchain_image_format{};
+        VkExtent2D swapchain_extent{};
+
+        std::vector<VkImage> swapchain_images;
+        std::vector<VkImageView> swapchain_image_views;
+
+        AllocatedImage drawable_image;
+    };
+
+    FrameData& get_current_frame() { return frames[STATE.frame_number % FRAME_OVERLAP]; };
+    FrameData frames[FRAME_OVERLAP];
 
     DescriptorAllocator globalDescriptorAllocator;
     VkDescriptorSet _drawImageDescriptors;
@@ -124,31 +133,11 @@ protected:
 
     VkPipeline _gradientPipeline;
     VkPipelineLayout _gradientPipelineLayout;
-
-    AllocatedImage _drawImage;
-    VkExtent2D _drawExtent;
-
-    // immediate submit structures
-    VkFence _immFence;
-    VkCommandBuffer _immCommandBuffer;
-    VkCommandPool _immCommandPool;
-
     std::vector<ComputeEffect> backgroundEffects;
 
-private:
-    void _init_sdl_window();
-    void _init_vulkan();
-    void _init_swapchain();
-    void _init_commands();
-    void _init_sync_structures();
-    void _init_pipelines();
-    void _init_descriptors();
-    void _init_imgui();
-
-
-    void create_swapchain();
-    void rebuild_swapchain();
-    void destroy_swapchain();
+    std::unique_ptr<EngineContext> ctx;
+    std::unique_ptr<SwapchainSystem> swapchain;
+    DeletionQueue mdq;
 };
 
 
