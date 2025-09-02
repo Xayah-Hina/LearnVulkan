@@ -44,6 +44,9 @@ public:
 
     // Destroy content-specific GPU objects
     virtual void destroy(const RenderContext& ctx) = 0;
+
+    // Optional ImGui hook. Default no op.
+    virtual void on_imgui() {}
 };
 
 

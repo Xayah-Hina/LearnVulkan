@@ -9,6 +9,9 @@
 
 #include <stdexcept>
 #include <cmath>
+#include <array>
+
+#include "imgui.h"
 
 #ifndef VK_CHECK
 #define VK_CHECK(x) do { VkResult err__ = (x); if (err__ != VK_SUCCESS) { throw std::runtime_error(std::string("Vulkan error ") + std::to_string(err__)); } } while(0)
@@ -153,6 +156,17 @@ void VulkanEngine::init()
     STATE.initialized = true;
     STATE.running = true;
     STATE.should_rendering = true;
+
+    ui_ = std::make_unique<ImGuiLayer>();
+    bool ok = ui_->init(ctx_.window,
+                        ctx_.instance,
+                        ctx_.physical,
+                        ctx_.device,
+                        ctx_.graphics_queue,
+                        ctx_.graphics_queue_family,
+                        swapchain_.swapchain_image_format,
+                        static_cast<uint32_t>(swapchain_.swapchain_images.size()));
+    if (!ok) throw std::runtime_error("ImGuiLayer init failed");
 }
 
 void VulkanEngine::begin_frame(uint32_t& imageIndex, VkCommandBuffer& cmd)
@@ -210,6 +224,7 @@ void VulkanEngine::run()
             if (e.type == SDL_EVENT_QUIT || e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) STATE.running = false;
             else if (e.type == SDL_EVENT_WINDOW_MINIMIZED) STATE.should_rendering = false;
             else if (e.type == SDL_EVENT_WINDOW_RESTORED || e.type == SDL_EVENT_WINDOW_MAXIMIZED) STATE.should_rendering = true;
+            if (ui_) ui_->process_event(&e);
         }
 
         if (!STATE.should_rendering)
@@ -221,6 +236,12 @@ void VulkanEngine::run()
         uint32_t imageIndex = 0;
         VkCommandBuffer cmd = VK_NULL_HANDLE;
         begin_frame(imageIndex, cmd);
+
+        if (ui_)
+        {
+            ui_->new_frame();
+            if (renderer_) renderer_->on_imgui();
+        }
 
         // Build per-frame RenderContext
         RenderContext rctx{};
@@ -235,6 +256,15 @@ void VulkanEngine::run()
 
         renderer_->record(cmd, static_cast<uint32_t>(swapchain_.swapchain_extent.width), static_cast<uint32_t>(swapchain_.swapchain_extent.height), rctx);
 
+        if (ui_)
+        {
+            ui_->render_overlay(cmd,
+                                swapchain_.swapchain_images[imageIndex],
+                                swapchain_.swapchain_image_views[imageIndex],
+                                swapchain_.swapchain_extent,
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        }
+
         end_frame(imageIndex, cmd);
         STATE.frame_number++;
     }
@@ -242,6 +272,12 @@ void VulkanEngine::run()
 
 void VulkanEngine::cleanup()
 {
+    if (ui_)
+    {
+        ui_->shutdown(ctx_.device);
+        ui_.reset();
+    }
+
     if (renderer_)
     {
         RenderContext rctx{};

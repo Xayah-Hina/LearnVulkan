@@ -14,6 +14,7 @@
 #include "vk_mem_alloc.h"
 
 #include "renderer_iface.h"
+#include "imgui_layer.h"
 
 struct DeletionQueue {
     std::vector<std::function<void()>> deleters;
@@ -98,6 +99,7 @@ private:
     DescriptorAllocator globalDescriptorAllocator_;
 
     std::unique_ptr<IRenderer> renderer_;
+    std::unique_ptr<ImGuiLayer> ui_;
 
     DeletionQueue mdq_;
 };

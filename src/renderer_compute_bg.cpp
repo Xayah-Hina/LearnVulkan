@@ -4,18 +4,20 @@
 #include "vk_descriptors.h"
 #include "vk_images.h"
 #include "vk_initializers.h"
+#include "vk_pipelines.h"
 
 #include <stdexcept>
 #include <cmath>
 #include <algorithm>
 
-#include "vk_pipelines.h"
+#include "imgui.h"
 
 #ifndef VK_CHECK
 #define VK_CHECK(x) do { VkResult err__ = (x); if (err__ != VK_SUCCESS) { throw std::runtime_error(std::string("Vulkan error ") + std::to_string(err__)); } } while(0)
 #endif
 
-void ComputeBackgroundRenderer::initialize(const RenderContext& ctx) {
+void ComputeBackgroundRenderer::initialize(const RenderContext& ctx)
+{
     // Descriptor set layout for storage image at binding 0
     {
         DescriptorLayoutBuilder b;
@@ -29,7 +31,7 @@ void ComputeBackgroundRenderer::initialize(const RenderContext& ctx) {
     // Point it to engine-provided offscreen image view
     VkDescriptorImageInfo imgInfo{};
     imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imgInfo.imageView   = ctx.offscreenImageView;
+    imgInfo.imageView = ctx.offscreenImageView;
 
     VkWriteDescriptorSet w{};
     w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -45,7 +47,7 @@ void ComputeBackgroundRenderer::initialize(const RenderContext& ctx) {
     {
         VkPushConstantRange pc{};
         pc.offset = 0;
-        pc.size   = sizeof(ComputePushConstants);
+        pc.size = sizeof(ComputePushConstants);
         pc.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
         VkPipelineLayoutCreateInfo ci{};
@@ -62,20 +64,22 @@ void ComputeBackgroundRenderer::initialize(const RenderContext& ctx) {
     VkShaderModule gradientShader{};
     VkShaderModule skyShader{};
 
-    if (!vkutil::load_shader_module("./shaders/gradient_color.comp.spv", ctx.device, &gradientShader)) {
+    if (!vkutil::load_shader_module("./shaders/gradient_color.comp.spv", ctx.device, &gradientShader))
+    {
         throw std::runtime_error("Failed to load gradient shader");
     }
-    if (!vkutil::load_shader_module("./shaders/sky.comp.spv", ctx.device, &skyShader)) {
+    if (!vkutil::load_shader_module("./shaders/sky.comp.spv", ctx.device, &skyShader))
+    {
         throw std::runtime_error("Failed to load sky shader");
     }
 
     VkPipelineShaderStageCreateInfo stage{};
-    stage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stage.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
-    stage.pName  = "main";
+    stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stage.pName = "main";
 
     VkComputePipelineCreateInfo pci{};
-    pci.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pci.layout = pipelineLayout_;
 
     // gradient
@@ -84,7 +88,7 @@ void ComputeBackgroundRenderer::initialize(const RenderContext& ctx) {
     ComputeEffect gradient{};
     gradient.name = "gradient";
     gradient.layout = pipelineLayout_;
-    gradient.data  = {};
+    gradient.data = {};
     gradient.data.data1 = glm::vec4(1.f, 0.f, 0.f, 1.f);
     gradient.data.data2 = glm::vec4(0.f, 0.f, 1.f, 1.f);
     VK_CHECK(vkCreateComputePipelines(ctx.device, VK_NULL_HANDLE, 1, &pci, nullptr, &gradient.pipeline));
@@ -110,7 +114,8 @@ void ComputeBackgroundRenderer::initialize(const RenderContext& ctx) {
 void ComputeBackgroundRenderer::record(VkCommandBuffer cmd,
                                        uint32_t width,
                                        uint32_t height,
-                                       const RenderContext& ctx) {
+                                       const RenderContext& ctx)
+{
     // Transition offscreen to GENERAL for compute write
     vkutil::transition_image(cmd, ctx.offscreenImage,
                              VK_IMAGE_LAYOUT_UNDEFINED,
@@ -124,7 +129,7 @@ void ComputeBackgroundRenderer::record(VkCommandBuffer cmd,
     vkCmdPushConstants(cmd, pipelineLayout_, VK_SHADER_STAGE_COMPUTE_BIT,
                        0, sizeof(ComputePushConstants), &fx.data);
 
-    const uint32_t gx = static_cast<uint32_t>(std::ceil(width  / 16.0));
+    const uint32_t gx = static_cast<uint32_t>(std::ceil(width / 16.0));
     const uint32_t gy = static_cast<uint32_t>(std::ceil(height / 16.0));
     vkCmdDispatch(cmd, gx, gy, 1);
 
@@ -147,10 +152,13 @@ void ComputeBackgroundRenderer::record(VkCommandBuffer cmd,
                              VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 }
 
-void ComputeBackgroundRenderer::destroy(const RenderContext& ctx) {
+void ComputeBackgroundRenderer::destroy(const RenderContext& ctx)
+{
     // Destroy pipelines
-    for (auto& e : effects_) {
-        if (e.pipeline) {
+    for (auto& e : effects_)
+    {
+        if (e.pipeline)
+        {
             vkDestroyPipeline(ctx.device, e.pipeline, nullptr);
             e.pipeline = VK_NULL_HANDLE;
         }
@@ -158,14 +166,28 @@ void ComputeBackgroundRenderer::destroy(const RenderContext& ctx) {
     effects_.clear();
 
     // Destroy pipeline layout
-    if (pipelineLayout_) {
+    if (pipelineLayout_)
+    {
         vkDestroyPipelineLayout(ctx.device, pipelineLayout_, nullptr);
         pipelineLayout_ = VK_NULL_HANDLE;
     }
 
     // Destroy descriptor set layout
-    if (drawImageSetLayout_) {
+    if (drawImageSetLayout_)
+    {
         vkDestroyDescriptorSetLayout(ctx.device, drawImageSetLayout_, nullptr);
         drawImageSetLayout_ = VK_NULL_HANDLE;
     }
+}
+
+void ComputeBackgroundRenderer::on_imgui()
+{
+    ImGui::Begin("Background");
+    ImGui::Text("Effect index: %d", current_effect_);
+    int e = current_effect_;
+    if (ImGui::RadioButton("Gradient", e == 0)) e = 0;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Sky", e == 1)) e = 1;
+    if (e != current_effect_) current_effect_ = e;
+    ImGui::End();
 }

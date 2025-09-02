@@ -29,6 +29,8 @@ public:
                 const RenderContext& ctx) override;
     void destroy(const RenderContext& ctx) override;
 
+    void on_imgui() override;
+
     // Optional API to switch effect at runtime
     void set_effect_index(int idx) { current_effect_ = idx; }
 
