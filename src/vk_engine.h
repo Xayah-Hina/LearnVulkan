@@ -1,44 +1,29 @@
 #ifndef VK_ENGINE_H
 #define VK_ENGINE_H
 
+
+#include <vulkan/vulkan.h>
+#include <SDL3/SDL.h>
+
+#include <memory>
+#include <string>
+#include <vector>
+#include <functional>
+
 #include "vk_descriptors.h"
 #include "vk_mem_alloc.h"
 
-#include <vulkan/vulkan.h>
-#include <glm/vec4.hpp>
-#include <memory>
-#include <string>
-#include <deque>
-#include <functional>
-#include <vector>
+#include "renderer_iface.h"
 
-// =======================================================
-// Constants
-// =======================================================
-constexpr unsigned int FRAME_OVERLAP = 2;
-
-// =======================================================
-// Utility: Deletion Queue
-// Collects cleanup callbacks and flushes them in reverse order
-// =======================================================
 struct DeletionQueue {
-    std::deque<std::function<void()>> deleters;
-
-    void push_function(std::function<void()>&& function) {
-        deleters.push_back(std::move(function));
-    }
-
+    std::vector<std::function<void()>> deleters;
+    void push_function(std::function<void()>&& fn) { deleters.emplace_back(std::move(fn)); }
     void flush() {
-        for (auto it = deleters.rbegin(); it != deleters.rend(); ++it) {
-            (*it)(); // call cleanup function
-        }
+        for (auto it = deleters.rbegin(); it != deleters.rend(); ++it) { (*it)(); }
         deleters.clear();
     }
 };
 
-// =======================================================
-// GPU Resources
-// =======================================================
 struct AllocatedImage {
     VkImage image{};
     VkImageView imageView{};
@@ -47,10 +32,8 @@ struct AllocatedImage {
     VkFormat imageFormat{};
 };
 
-// =======================================================
-// Per-Frame Data
-// Holds sync objects and command buffers
-// =======================================================
+constexpr unsigned int FRAME_OVERLAP = 2;
+
 struct FrameData {
     VkSemaphore swapchainSemaphore{};
     VkSemaphore renderSemaphore{};
@@ -60,58 +43,36 @@ struct FrameData {
     DeletionQueue deletionQueue;
 };
 
-// =======================================================
-// Compute Pipeline Resources
-// =======================================================
-struct ComputePushConstants {
-    glm::vec4 data1{};
-    glm::vec4 data2{};
-    glm::vec4 data3{};
-    glm::vec4 data4{};
-};
-
-struct ComputeEffect {
-    const char* name{};
-    VkPipeline pipeline{};
-    VkPipelineLayout layout{};
-    ComputePushConstants data{};
-};
-
-// =======================================================
-// Vulkan Engine
-// =======================================================
 class VulkanEngine {
 public:
     VulkanEngine();
     ~VulkanEngine();
 
-    void init();     // Initialize Vulkan and resources
-    void cleanup();  // Destroy resources
-    void run();      // Main loop
+    void init();
+    void run();
+    void cleanup();
 
-protected:
-    void draw();     // Render a frame
+    // Allow plugging different renderers
+    void set_renderer(std::unique_ptr<IRenderer> r) { renderer_ = std::move(r); }
 
 private:
-    // ----------------------------
-    // Engine state (window + flags)
-    // ----------------------------
+    // Frame helpers
+    void begin_frame(uint32_t& imageIndex, VkCommandBuffer& cmd);
+    void end_frame(uint32_t imageIndex, VkCommandBuffer cmd);
+
+private:
     struct {
         std::string name = "Vulkan Engine";
-        int width = 1700;
+        int width  = 1700;
         int height = 800;
         bool initialized{false};
         bool running{false};
         bool should_rendering{false};
-        int frame_number{0};
-        int current_background_effect{1};
+        int  frame_number{0};
     } STATE;
 
-    // ----------------------------
-    // Vulkan Context
-    // ----------------------------
     struct EngineContext {
-        struct SDL_Window* window{nullptr};
+        SDL_Window* window{nullptr};
         VkSurfaceKHR surface{};
         VkInstance instance{};
         VkDebugUtilsMessengerEXT debug_messenger{};
@@ -120,45 +81,26 @@ private:
         VkQueue graphics_queue{};
         uint32_t graphics_queue_family{};
         VmaAllocator allocator{};
-    };
+    } ctx_;
 
-    // ----------------------------
-    // Swapchain
-    // ----------------------------
     struct SwapchainSystem {
         VkSwapchainKHR swapchain{};
         VkFormat swapchain_image_format{};
         VkExtent2D swapchain_extent{};
         std::vector<VkImage> swapchain_images;
         std::vector<VkImageView> swapchain_image_views;
-        AllocatedImage drawable_image; // offscreen render target
-    };
+        // Engine-offered offscreen target for content
+        AllocatedImage drawable_image;
+    } swapchain_;
 
-    // ----------------------------
-    // Helpers
-    // ----------------------------
-    FrameData& get_current_frame() {
-        return frames[STATE.frame_number % FRAME_OVERLAP];
-    }
+    FrameData frames_[FRAME_OVERLAP];
 
-    // ----------------------------
-    // Members
-    // ----------------------------
-    FrameData frames[FRAME_OVERLAP];
+    DescriptorAllocator globalDescriptorAllocator_;
 
-    DescriptorAllocator globalDescriptorAllocator;
-    VkDescriptorSet _drawImageDescriptors{};
-    VkDescriptorSetLayout _drawImageDescriptorLayout{};
+    std::unique_ptr<IRenderer> renderer_;
 
-    VkPipeline _gradientPipeline{};
-    VkPipelineLayout _gradientPipelineLayout{};
-
-    std::vector<ComputeEffect> backgroundEffects;
-
-    std::unique_ptr<EngineContext> ctx;
-    std::unique_ptr<SwapchainSystem> swapchain;
-
-    DeletionQueue mdq; // main deletion queue
+    DeletionQueue mdq_;
 };
+
 
 #endif // VK_ENGINE_H

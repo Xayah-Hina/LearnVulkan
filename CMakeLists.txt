@@ -21,6 +21,10 @@ set(src_files
         src/vk_descriptors.h
         src/vk_pipelines.cpp
         src/vk_pipelines.h
+
+        src/renderer_compute_bg.cpp
+        src/renderer_compute_bg.h
+        src/renderer_iface.h
 )
 set(VulkanAppName "vulkan_app")
 add_executable(${VulkanAppName}
