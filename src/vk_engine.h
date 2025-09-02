@@ -61,6 +61,11 @@ private:
     void begin_frame(uint32_t& imageIndex, VkCommandBuffer& cmd);
     void end_frame(uint32_t imageIndex, VkCommandBuffer cmd);
 
+    // Swapchain (re)creation helpers
+    void create_swapchain(uint32_t width, uint32_t height);
+    void destroy_swapchain();
+    void recreate_swapchain();
+
 private:
     struct {
         std::string name = "Vulkan Engine";
@@ -70,6 +75,7 @@ private:
         bool running{false};
         bool should_rendering{false};
         int  frame_number{0};
+        bool resize_requested{false};
     } STATE;
 
     struct EngineContext {

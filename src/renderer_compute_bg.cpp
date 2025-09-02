@@ -180,6 +180,23 @@ void ComputeBackgroundRenderer::destroy(const RenderContext& ctx)
     }
 }
 
+void ComputeBackgroundRenderer::on_swapchain_resized(const RenderContext& ctx)
+{
+    VkDescriptorImageInfo imgInfo{};
+    imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imgInfo.imageView   = ctx.offscreenImageView;
+
+    VkWriteDescriptorSet w{};
+    w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    w.dstSet          = drawImageSet_;
+    w.dstBinding      = 0;
+    w.descriptorCount = 1;
+    w.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    w.pImageInfo      = &imgInfo;
+
+    vkUpdateDescriptorSets(ctx.device, 1, &w, 0, nullptr);
+}
+
 void ComputeBackgroundRenderer::on_imgui()
 {
     ImGui::Begin("Background");

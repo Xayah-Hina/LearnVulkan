@@ -17,6 +17,39 @@
 #define VK_CHECK(x) do { VkResult err__ = (x); if (err__ != VK_SUCCESS) { throw std::runtime_error(std::string("Vulkan error ") + std::to_string(err__)); } } while(0)
 #endif
 
+static void create_offscreen_drawable(VmaAllocator allocator,
+                                      VkDevice device,
+                                      VkFormat format,
+                                      VkExtent2D extent,
+                                      AllocatedImage& outImage)
+{
+    outImage.imageFormat = format;
+    outImage.imageExtent = {extent.width, extent.height, 1};
+
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+        | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+        | VK_IMAGE_USAGE_STORAGE_BIT
+        | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageCreateInfo imgci = vkinit::image_create_info(outImage.imageFormat, usage, outImage.imageExtent);
+
+    VmaAllocationCreateInfo ainfo{};
+    ainfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    ainfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VK_CHECK(vmaCreateImage(allocator, &imgci, &ainfo, &outImage.image, &outImage.allocation, nullptr));
+
+    VkImageViewCreateInfo viewci = vkinit::imageview_create_info(outImage.imageFormat, outImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
+    VK_CHECK(vkCreateImageView(device, &viewci, nullptr, &outImage.imageView));
+}
+
+static void destroy_offscreen_drawable(VmaAllocator allocator, VkDevice device, AllocatedImage& img)
+{
+    if (img.imageView) vkDestroyImageView(device, img.imageView, nullptr);
+    if (img.image) vmaDestroyImage(allocator, img.image, img.allocation);
+    img = {}; // reset
+}
+
 VulkanEngine::VulkanEngine() = default;
 VulkanEngine::~VulkanEngine() = default;
 
@@ -25,7 +58,7 @@ void VulkanEngine::init()
     // Window
     if (!SDL_Init(SDL_INIT_VIDEO))
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
-    ctx_.window = SDL_CreateWindow("Vulkan Engine", STATE.width, STATE.height, SDL_WINDOW_VULKAN);
+    ctx_.window = SDL_CreateWindow("Vulkan Engine", STATE.width, STATE.height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
     if (!ctx_.window)
         throw std::runtime_error(std::string("SDL_CreateWindow failed: ") + SDL_GetError());
 
@@ -80,37 +113,19 @@ void VulkanEngine::init()
     }
 
     // Swapchain
-    vkb::SwapchainBuilder sb{ctx_.physical, ctx_.device, ctx_.surface};
-    swapchain_.swapchain_image_format = VK_FORMAT_B8G8R8A8_UNORM;
-    vkb::Swapchain sc = sb.set_desired_format(VkSurfaceFormatKHR{swapchain_.swapchain_image_format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-                          .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-                          .set_desired_extent(STATE.width, STATE.height)
-                          .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-                          .build().value();
-    swapchain_.swapchain = sc.swapchain;
-    swapchain_.swapchain_extent = sc.extent;
-    swapchain_.swapchain_images = sc.get_images().value();
-    swapchain_.swapchain_image_views = sc.get_image_views().value();
+    create_swapchain(STATE.width, STATE.height);
 
-    // Offscreen image offered to content
-    swapchain_.drawable_image.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
-    swapchain_.drawable_image.imageExtent = {swapchain_.swapchain_extent.width, swapchain_.swapchain_extent.height, 1};
+    // Offscreen image
+    create_offscreen_drawable(ctx_.allocator, ctx_.device,
+                              VK_FORMAT_R16G16B16A16_SFLOAT,
+                              swapchain_.swapchain_extent,
+                              swapchain_.drawable_image);
 
-    VkImageUsageFlags offUsage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    VkImageCreateInfo imgci = vkinit::image_create_info(swapchain_.drawable_image.imageFormat, offUsage, swapchain_.drawable_image.imageExtent);
-
-    VmaAllocationCreateInfo ainfo{};
-    ainfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    ainfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    VK_CHECK(vmaCreateImage(ctx_.allocator, &imgci, &ainfo, &swapchain_.drawable_image.image, &swapchain_.drawable_image.allocation, nullptr));
-
-    VkImageViewCreateInfo viewci = vkinit::imageview_create_info(swapchain_.drawable_image.imageFormat, swapchain_.drawable_image.image, VK_IMAGE_ASPECT_COLOR_BIT);
-    VK_CHECK(vkCreateImageView(ctx_.device, &viewci, nullptr, &swapchain_.drawable_image.imageView));
-
+    // keep old deletion on exit (engine lifetime)
     mdq_.push_function([&]()
     {
-        vkDestroyImageView(ctx_.device, swapchain_.drawable_image.imageView, nullptr);
-        vmaDestroyImage(ctx_.allocator, swapchain_.drawable_image.image, swapchain_.drawable_image.allocation);
+        destroy_offscreen_drawable(ctx_.allocator, ctx_.device, swapchain_.drawable_image);
+        destroy_swapchain();
     });
 
     // Per-frame resources
@@ -167,6 +182,37 @@ void VulkanEngine::init()
                         swapchain_.swapchain_image_format,
                         static_cast<uint32_t>(swapchain_.swapchain_images.size()));
     if (!ok) throw std::runtime_error("ImGuiLayer init failed");
+
+    // Register a simple panel that displays the swapchain extent
+    ui_->add_panel([this]()
+    {
+        ImGui::Begin("Swapchain");
+
+        const VkExtent2D sc = swapchain_.swapchain_extent;
+        ImGui::Text("Extent: %u x %u", sc.width, sc.height);
+
+        // Compare with the previous frame to detect changes
+        static VkExtent2D prev{~0u, ~0u}; // init to sentinel
+        const bool changed = (prev.width != sc.width) || (prev.height != sc.height);
+        ImGui::Text("Changed this frame: %s", changed ? "Yes" : "No");
+        prev = sc;
+
+        // Optional extra info
+        ImGui::Separator();
+        ImGui::Text("Images: %zu", swapchain_.swapchain_images.size());
+        ImGui::Text("Format: 0x%08X", (uint32_t)swapchain_.swapchain_image_format);
+
+        // Optional: window logical vs pixel size (helps debugging DPI vs extent)
+        int win_w = 0, win_h = 0;
+        SDL_GetWindowSize(ctx_.window, &win_w, &win_h);
+        int px_w = 0, px_h = 0;
+        SDL_GetWindowSizeInPixels(ctx_.window, &px_w, &px_h);
+        ImGui::Separator();
+        ImGui::Text("Window logical: %d x %d", win_w, win_h);
+        ImGui::Text("Window pixels : %d x %d", px_w, px_h);
+
+        ImGui::End();
+    });
 }
 
 void VulkanEngine::begin_frame(uint32_t& imageIndex, VkCommandBuffer& cmd)
@@ -179,7 +225,7 @@ void VulkanEngine::begin_frame(uint32_t& imageIndex, VkCommandBuffer& cmd)
     VkResult acq = vkAcquireNextImageKHR(ctx_.device, swapchain_.swapchain, 1000000000, fr.swapchainSemaphore, nullptr, &imageIndex);
     if (acq == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        throw std::runtime_error("Swapchain recreation is not implemented in this sample");
+        STATE.resize_requested = true;
     }
     VK_CHECK(acq);
 
@@ -214,6 +260,81 @@ void VulkanEngine::end_frame(uint32_t imageIndex, VkCommandBuffer cmd)
     VK_CHECK(vkQueuePresentKHR(ctx_.graphics_queue, &pi));
 }
 
+void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
+{
+    vkb::SwapchainBuilder sb{ctx_.physical, ctx_.device, ctx_.surface};
+    swapchain_.swapchain_image_format = VK_FORMAT_B8G8R8A8_UNORM;
+
+    vkb::Swapchain sc = sb
+                        .set_desired_format(VkSurfaceFormatKHR{swapchain_.swapchain_image_format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+                        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+                        .set_desired_extent(width, height)
+                        .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                        .build().value();
+
+    swapchain_.swapchain = sc.swapchain;
+    swapchain_.swapchain_extent = sc.extent;
+    swapchain_.swapchain_images = sc.get_images().value();
+    swapchain_.swapchain_image_views = sc.get_image_views().value();
+}
+
+void VulkanEngine::destroy_swapchain()
+{
+    // destroy swapchain image views
+    for (auto v : swapchain_.swapchain_image_views)
+    {
+        if (v) vkDestroyImageView(ctx_.device, v, nullptr);
+    }
+    swapchain_.swapchain_image_views.clear();
+    swapchain_.swapchain_images.clear();
+
+    if (swapchain_.swapchain)
+    {
+        vkDestroySwapchainKHR(ctx_.device, swapchain_.swapchain, nullptr);
+        swapchain_.swapchain = VK_NULL_HANDLE;
+    }
+}
+
+void VulkanEngine::recreate_swapchain()
+{
+    // 1) idle device to simplify lifetime hazards
+    vkDeviceWaitIdle(ctx_.device);
+
+    // 2) destroy old offscreen + swapchain
+    destroy_offscreen_drawable(ctx_.allocator, ctx_.device, swapchain_.drawable_image);
+    destroy_swapchain();
+
+    // 3) query new window size
+    int w = 0, h = 0;
+    SDL_GetWindowSize(ctx_.window, &w, &h);
+    w = std::max(1, w);
+    h = std::max(1, h);
+
+    // 4) recreate swapchain and offscreen
+    create_swapchain((uint32_t)w, (uint32_t)h);
+    create_offscreen_drawable(ctx_.allocator, ctx_.device,
+                              VK_FORMAT_R16G16B16A16_SFLOAT,
+                              swapchain_.swapchain_extent,
+                              swapchain_.drawable_image);
+
+    // 5) rebind the storage image descriptor to the new offscreen view
+    RenderContext rctx{};
+    rctx.device = ctx_.device;
+    rctx.allocator = ctx_.allocator;
+    rctx.frameExtent = swapchain_.swapchain_extent;
+    rctx.swapchainFormat = swapchain_.swapchain_image_format;
+    rctx.offscreenImage = swapchain_.drawable_image.image;
+    rctx.offscreenImageView = swapchain_.drawable_image.imageView;
+    rctx.descriptorAllocator = &globalDescriptorAllocator_;
+
+    if (renderer_) renderer_->on_swapchain_resized(rctx);
+
+    // 6) tell ImGui backend new min image count (optional)
+    if (ui_) ui_->set_min_image_count(static_cast<uint32_t>(swapchain_.swapchain_images.size()));
+
+    STATE.resize_requested = false;
+}
+
 void VulkanEngine::run()
 {
     SDL_Event e{};
@@ -221,9 +342,31 @@ void VulkanEngine::run()
     {
         while (SDL_PollEvent(&e))
         {
-            if (e.type == SDL_EVENT_QUIT || e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) STATE.running = false;
-            else if (e.type == SDL_EVENT_WINDOW_MINIMIZED) STATE.should_rendering = false;
-            else if (e.type == SDL_EVENT_WINDOW_RESTORED || e.type == SDL_EVENT_WINDOW_MAXIMIZED) STATE.should_rendering = true;
+            switch (e.type)
+            {
+            case SDL_EVENT_QUIT:
+            case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                STATE.running = false;
+                break;
+
+            case SDL_EVENT_WINDOW_MINIMIZED:
+                STATE.should_rendering = false;
+                break;
+
+            case SDL_EVENT_WINDOW_RESTORED:
+            case SDL_EVENT_WINDOW_MAXIMIZED:
+                STATE.should_rendering = true;
+                break;
+
+            case SDL_EVENT_WINDOW_RESIZED:
+            case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+                STATE.resize_requested = true;
+                break;
+
+            default:
+                break;
+            }
+
             if (ui_) ui_->process_event(&e);
         }
 
@@ -233,9 +376,24 @@ void VulkanEngine::run()
             continue;
         }
 
+        // handle deferred resize
+        if (STATE.resize_requested)
+        {
+            recreate_swapchain();
+            continue; // start next frame
+        }
+
         uint32_t imageIndex = 0;
         VkCommandBuffer cmd = VK_NULL_HANDLE;
         begin_frame(imageIndex, cmd);
+
+        // if swapchain was out of date, begin_frame() returns early
+        if (cmd == VK_NULL_HANDLE)
+        {
+            // try to rebuild now
+            if (STATE.resize_requested) recreate_swapchain();
+            continue;
+        }
 
         if (ui_)
         {

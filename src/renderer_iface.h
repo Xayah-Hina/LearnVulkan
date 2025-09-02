@@ -45,6 +45,9 @@ public:
     // Destroy content-specific GPU objects
     virtual void destroy(const RenderContext& ctx) = 0;
 
+    // Optional swapchain resize hook. Default no op.
+    virtual void on_swapchain_resized(const RenderContext& ctx) {}
+
     // Optional ImGui hook. Default no op.
     virtual void on_imgui() {}
 };

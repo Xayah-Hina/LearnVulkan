@@ -28,7 +28,7 @@ public:
                 uint32_t height,
                 const RenderContext& ctx) override;
     void destroy(const RenderContext& ctx) override;
-
+    void on_swapchain_resized(const RenderContext& ctx) override;
     void on_imgui() override;
 
     // Optional API to switch effect at runtime
