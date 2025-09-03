@@ -29,6 +29,9 @@ struct RenderContext
 
     // Global descriptor allocator owned by engine
     DescriptorAllocator* descriptorAllocator{};
+
+    VkQueue graphics_queue{};
+    uint32_t graphics_queue_family{};
 };
 
 class IRenderer
@@ -50,7 +53,7 @@ public:
     virtual void destroy(const RenderContext& ctx) = 0;
 
     // Optional swapchain resize hook. Default no op.
-    virtual void on_swapchain_resized(const RenderContext& ctx) {}
+    virtual void on_swapchain_resized(const RenderContext& ctx) = 0;
 
     // Optional ImGui hook. Default no op.
     virtual void on_imgui() {}

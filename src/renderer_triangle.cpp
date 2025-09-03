@@ -132,7 +132,6 @@ void TriangleRenderer::destroy(const RenderContext& ctx)
 
 void TriangleRenderer::on_swapchain_resized(const RenderContext& ctx)
 {
-    IRenderer::on_swapchain_resized(ctx);
 }
 
 void TriangleRenderer::on_imgui()

@@ -204,6 +204,8 @@ void VulkanEngine::init()
     rctx.offscreenImage = swapchain_.drawable_image.image;
     rctx.offscreenImageView = swapchain_.drawable_image.imageView;
     rctx.descriptorAllocator = &globalDescriptorAllocator_;
+    rctx.graphics_queue = ctx_.graphics_queue;
+    rctx.graphics_queue_family = ctx_.graphics_queue_family;
 
     renderer_->initialize(rctx);
 
@@ -457,6 +459,8 @@ void VulkanEngine::run()
         rctx.descriptorAllocator = &globalDescriptorAllocator_;
         rctx.depthImage     = depth_image_.image;
         rctx.depthImageView = depth_image_.imageView;
+        rctx.graphics_queue = ctx_.graphics_queue;
+        rctx.graphics_queue_family = ctx_.graphics_queue_family;
 
         renderer_->record(cmd, static_cast<uint32_t>(swapchain_.swapchain_extent.width), static_cast<uint32_t>(swapchain_.swapchain_extent.height), rctx);
 
@@ -531,9 +535,11 @@ void VulkanEngine::cleanup()
 // Factory for default renderer
 #include "renderer_compute_bg.h"
 #include "renderer_triangle.h"
+#include "renderer_mesh.h"
 
 std::unique_ptr<IRenderer> CreateDefaultComputeRenderer()
 {
     // return std::make_unique<ComputeBackgroundRenderer>();
-    return std::make_unique<TriangleRenderer>();
+    // return std::make_unique<TriangleRenderer>();
+    return std::make_unique<MeshRenderer>();
 }
