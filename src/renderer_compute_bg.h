@@ -6,21 +6,24 @@
 #include <glm/vec4.hpp>
 #include <vector>
 
-struct ComputePushConstants {
+struct ComputePushConstants
+{
     glm::vec4 data1{};
     glm::vec4 data2{};
     glm::vec4 data3{};
     glm::vec4 data4{};
 };
 
-struct ComputeEffect {
+struct ComputeEffect
+{
     const char* name{};
     VkPipeline pipeline{};
     VkPipelineLayout layout{};
     ComputePushConstants data{};
 };
 
-class ComputeBackgroundRenderer final : public IRenderer {
+class ComputeBackgroundRenderer final : public IRenderer
+{
 public:
     void initialize(const RenderContext& ctx) override;
     void record(VkCommandBuffer cmd,
@@ -48,7 +51,6 @@ private:
 
     int current_effect_{1};
 };
-
 
 
 #endif //RENDERER_COMPUTE_BG_H

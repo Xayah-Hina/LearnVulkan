@@ -104,6 +104,8 @@ private:
 
     DescriptorAllocator globalDescriptorAllocator_;
 
+    AllocatedImage depth_image_{};
+
     std::unique_ptr<IRenderer> renderer_;
     std::unique_ptr<ImGuiLayer> ui_;
 

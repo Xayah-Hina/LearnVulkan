@@ -23,6 +23,10 @@ struct RenderContext
     VkImage offscreenImage{};
     VkImageView offscreenImageView{};
 
+    // Engine-managed depth image for 3D rendering
+    VkImage     depthImage{VK_NULL_HANDLE};
+    VkImageView depthImageView{VK_NULL_HANDLE};
+
     // Global descriptor allocator owned by engine
     DescriptorAllocator* descriptorAllocator{};
 };

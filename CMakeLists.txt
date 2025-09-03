@@ -24,6 +24,8 @@ set(src_files
 
         src/renderer_compute_bg.cpp
         src/renderer_compute_bg.h
+        src/renderer_triangle.cpp
+        src/renderer_triangle.h
         src/renderer_iface.h
         src/imgui_layer.cpp
         src/imgui_layer.h

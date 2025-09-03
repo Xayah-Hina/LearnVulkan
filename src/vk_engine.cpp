@@ -50,6 +50,38 @@ static void destroy_offscreen_drawable(VmaAllocator allocator, VkDevice device, 
     img = {}; // reset
 }
 
+static void create_depth_image(VmaAllocator allocator,
+                               VkDevice device,
+                               VkFormat depthFormat,
+                               VkExtent2D extent,
+                               AllocatedImage& outImage)
+{
+    outImage.imageFormat = depthFormat;
+    outImage.imageExtent = {extent.width, extent.height, 1};
+
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    VkImageCreateInfo imgci = vkinit::image_create_info(outImage.imageFormat, usage, outImage.imageExtent);
+
+    VmaAllocationCreateInfo ainfo{};
+    ainfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    ainfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VK_CHECK(vmaCreateImage(allocator, &imgci, &ainfo, &outImage.image, &outImage.allocation, nullptr));
+
+    VkImageViewCreateInfo viewci =
+        vkinit::imageview_create_info(outImage.imageFormat, outImage.image, VK_IMAGE_ASPECT_DEPTH_BIT);
+    VK_CHECK(vkCreateImageView(device, &viewci, nullptr, &outImage.imageView));
+}
+
+static void destroy_depth_image(VmaAllocator allocator, VkDevice device, AllocatedImage& img)
+{
+    if (img.imageView) vkDestroyImageView(device, img.imageView, nullptr);
+    if (img.image) vmaDestroyImage(allocator, img.image, img.allocation);
+    img = {};
+}
+
+
 VulkanEngine::VulkanEngine() = default;
 VulkanEngine::~VulkanEngine() = default;
 
@@ -121,9 +153,16 @@ void VulkanEngine::init()
                               swapchain_.swapchain_extent,
                               swapchain_.drawable_image);
 
+    // Depth image
+    create_depth_image(ctx_.allocator, ctx_.device,
+                       VK_FORMAT_D32_SFLOAT,
+                       swapchain_.swapchain_extent,
+                       depth_image_);
+
     // keep old deletion on exit (engine lifetime)
     mdq_.push_function([&]()
     {
+        destroy_depth_image(ctx_.allocator, ctx_.device, depth_image_);
         destroy_offscreen_drawable(ctx_.allocator, ctx_.device, swapchain_.drawable_image);
         destroy_swapchain();
     });
@@ -301,6 +340,7 @@ void VulkanEngine::recreate_swapchain()
     vkDeviceWaitIdle(ctx_.device);
 
     // 2) destroy old offscreen + swapchain
+    destroy_depth_image(ctx_.allocator, ctx_.device, depth_image_);
     destroy_offscreen_drawable(ctx_.allocator, ctx_.device, swapchain_.drawable_image);
     destroy_swapchain();
 
@@ -316,6 +356,10 @@ void VulkanEngine::recreate_swapchain()
                               VK_FORMAT_R16G16B16A16_SFLOAT,
                               swapchain_.swapchain_extent,
                               swapchain_.drawable_image);
+    create_depth_image(ctx_.allocator, ctx_.device,
+                       VK_FORMAT_D32_SFLOAT,
+                       swapchain_.swapchain_extent,
+                       depth_image_);
 
     // 5) rebind the storage image descriptor to the new offscreen view
     RenderContext rctx{};
@@ -411,6 +455,8 @@ void VulkanEngine::run()
         rctx.offscreenImage = swapchain_.drawable_image.image;
         rctx.offscreenImageView = swapchain_.drawable_image.imageView;
         rctx.descriptorAllocator = &globalDescriptorAllocator_;
+        rctx.depthImage     = depth_image_.image;
+        rctx.depthImageView = depth_image_.imageView;
 
         renderer_->record(cmd, static_cast<uint32_t>(swapchain_.swapchain_extent.width), static_cast<uint32_t>(swapchain_.swapchain_extent.height), rctx);
 
@@ -484,8 +530,10 @@ void VulkanEngine::cleanup()
 
 // Factory for default renderer
 #include "renderer_compute_bg.h"
+#include "renderer_triangle.h"
 
 std::unique_ptr<IRenderer> CreateDefaultComputeRenderer()
 {
-    return std::make_unique<ComputeBackgroundRenderer>();
+    // return std::make_unique<ComputeBackgroundRenderer>();
+    return std::make_unique<TriangleRenderer>();
 }
