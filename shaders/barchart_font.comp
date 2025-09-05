@@ -1,0 +1,64 @@
+#version 460
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 目标：与柱状图相同的 offscreen storage image
+layout(set=0, binding=0, rgba16f) uniform image2D dstImg;
+
+// MSDF 图集
+layout(set=0, binding=1) uniform sampler2D msdfAtlas;
+
+// 每个字形一个实例
+struct Glyph {
+    vec2 pos;     // 屏幕像素坐标（左上为原点）
+    vec2 size;    // 像素尺寸（宽高）
+    vec4 uvRect;  // atlas UV，xy=左上，zw=右下（与 -yorigin top 匹配）
+    vec4 color;   // RGBA
+};
+layout(std430, set=0, binding=2) buffer Glyphs { Glyph g[]; };
+
+// push 常量
+layout(push_constant) uniform PC {
+    uint screenW;
+    uint screenH;
+    float pxRange;   // 生成图集时的 -pxrange（像素）
+    float gamma;     // 伽马（例如 2.2）
+} pc;
+
+// 三通道取中值
+float median3(vec3 v) { return max(min(v.r, v.g), min(max(v.r, v.g), v.b)); }
+
+// 采样得到以像素为单位的距离
+float msdfDistPx(vec2 uv) {
+    vec3 s = texture(msdfAtlas, uv).rgb;
+    return (median3(s) - 0.5) * pc.pxRange;
+}
+
+void main() {
+    ivec2 P = ivec2(gl_GlobalInvocationID.xy);
+    if (P.x >= int(pc.screenW) || P.y >= int(pc.screenH)) return;
+
+    vec4 dst = imageLoad(dstImg, P);
+
+    // 少量文字时，逐像素遍历所有 glyph 足够快；大量文字可改 tile/binning
+    for (uint i = 0u; i < g.length(); ++i) {
+        vec2 pos = g[i].pos;
+        vec2 size = g[i].size;
+
+        if (float(P.x) < pos.x || float(P.x) >= pos.x + size.x) continue;
+        if (float(P.y) < pos.y || float(P.y) >= pos.y + size.y) continue;
+
+        // 屏幕像素映射到字形局部 uv∈[0,1]
+        vec2 uv = (vec2(P) - pos) / size;
+        vec2 uvA = mix(g[i].uvRect.xy, g[i].uvRect.zw, uv);
+
+        // 自适应抗锯齿
+        float d = msdfDistPx(uvA);
+        float afwidth = 0.75;                   // 可调
+        float alpha = clamp(smoothstep(-afwidth, afwidth, d), 0.0, 1.0);
+
+        vec4 src = vec4(g[i].color.rgb, g[i].color.a * alpha);
+        dst = mix(dst, src, src.a);             // over
+    }
+
+    imageStore(dstImg, P, dst);
+}

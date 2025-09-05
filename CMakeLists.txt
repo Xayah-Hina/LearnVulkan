@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.26)
 project(LearnVulkan)
 
+include(cmake/compile_font_msdf.cmake)
 include(cmake/compile_shaders.cmake)
 include(cmake/setup_glm.cmake)
 include(cmake/setup_imgui.cmake)
@@ -35,6 +36,8 @@ set(src_files
         examples/renderer_mesh.h
         examples/renderer_barchart.cpp
         examples/renderer_barchart.h
+        examples/renderer_barchart_font.cpp
+        examples/renderer_barchart_font.h
 )
 set(VulkanAppName "vulkan_app")
 add_executable(${VulkanAppName}

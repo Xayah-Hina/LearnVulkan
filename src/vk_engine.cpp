@@ -196,7 +196,7 @@ void VulkanEngine::create_context(int window_width, int window_height, const cha
     ac.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     VK_CHECK(vmaCreateAllocator(&ac, &ctx_.allocator));
     mdq_.push_function([&]() { vmaDestroyAllocator(ctx_.allocator); });
-    std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1.0f}};
+    std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1.0f}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1.0f}, {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.0f}};
     ctx_.descriptor_allocator.init_pool(ctx_.device, 10, sizes);
     mdq_.push_function([&]() { ctx_.descriptor_allocator.destroy_pool(ctx_.device); });
 }

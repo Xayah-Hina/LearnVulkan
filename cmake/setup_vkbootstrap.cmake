@@ -2,7 +2,7 @@
 # vk-bootstrap auto-download setup
 # ================================
 
-set(VKB_VERSION "1.4.325")
+set(VKB_VERSION "1.4.321")
 
 set(VKB_PRIMARY_URL
         "https://github.com/charles-lunarg/vk-bootstrap/archive/refs/tags/v${VKB_VERSION}.zip"
