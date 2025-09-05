@@ -13,6 +13,10 @@ include(cmake/setup_vulkan.cmake)
 set(src_files
         src/vk_engine.cpp
         src/vk_engine.h
+        src/renderer_iface.h
+        src/imgui_layer.cpp
+        src/imgui_layer.h
+
         src/ext/vk_initializers.cpp
         src/ext/vk_initializers.h
         src/ext/vk_images.cpp
@@ -22,15 +26,15 @@ set(src_files
         src/ext/vk_pipelines.cpp
         src/ext/vk_pipelines.h
 
-        src/renderer_compute_bg.cpp
-        src/renderer_compute_bg.h
-        src/renderer_triangle.cpp
-        src/renderer_triangle.h
-        src/renderer_mesh.cpp
-        src/renderer_mesh.h
-        src/renderer_iface.h
-        src/imgui_layer.cpp
-        src/imgui_layer.h
+        examples/entrance.cpp
+        examples/renderer_compute_bg.cpp
+        examples/renderer_compute_bg.h
+        examples/renderer_triangle.cpp
+        examples/renderer_triangle.h
+        examples/renderer_mesh.cpp
+        examples/renderer_mesh.h
+        examples/renderer_barchart.cpp
+        examples/renderer_barchart.h
 )
 set(VulkanAppName "vulkan_app")
 add_executable(${VulkanAppName}

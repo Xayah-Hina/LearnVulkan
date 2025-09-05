@@ -1,8 +1,8 @@
 #include "renderer_triangle.h"
 
-#include "ext/vk_initializers.h"
-#include "ext/vk_images.h"
-#include "ext/vk_pipelines.h"
+#include "src/ext/vk_initializers.h"
+#include "src/ext/vk_images.h"
+#include "src/ext/vk_pipelines.h"
 #include <stdexcept>
 
 #ifndef VK_CHECK

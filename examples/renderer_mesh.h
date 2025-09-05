@@ -1,7 +1,7 @@
 #ifndef RENDERER_MESH_H
 #define RENDERER_MESH_H
 
-#include "renderer_iface.h"
+#include "src/renderer_iface.h"
 #include <glm/mat4x4.hpp>
 #include <functional>
 

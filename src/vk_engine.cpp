@@ -490,15 +490,3 @@ void VulkanEngine::destroy_imgui()
 {
     IF_NOT_NULL_DO_AND_SET(ui_, { ui_->shutdown(ctx_.device); ui_.reset(); }, nullptr);
 }
-
-// Factory for default renderer
-#include "renderer_compute_bg.h"
-#include "renderer_triangle.h"
-#include "renderer_mesh.h"
-
-std::unique_ptr<IRenderer> CreateDefaultComputeRenderer()
-{
-    return std::make_unique<ComputeBackgroundRenderer>();
-    // return std::make_unique<TriangleRenderer>();
-    // return std::make_unique<MeshRenderer>();
-}

@@ -1,7 +1,7 @@
 #ifndef RENDERER_TRIANGLE_H
 #define RENDERER_TRIANGLE_H
 
-#include "renderer_iface.h"
+#include "src/renderer_iface.h"
 
 class TriangleRenderer final : public IRenderer
 {

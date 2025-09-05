@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <cstdint>
 
-class DescriptorAllocator; // forward decl from your project
+struct  DescriptorAllocator; // forward decl from your project
 
 struct RenderContext
 {

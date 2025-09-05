@@ -1,10 +1,10 @@
 #include "renderer_compute_bg.h"
 #include "renderer_compute_bg.h"
 
-#include "ext/vk_descriptors.h"
-#include "ext/vk_images.h"
-#include "ext/vk_initializers.h"
-#include "ext/vk_pipelines.h"
+#include "src/ext/vk_descriptors.h"
+#include "src/ext/vk_images.h"
+#include "src/ext/vk_initializers.h"
+#include "src/ext/vk_pipelines.h"
 
 #include <stdexcept>
 #include <cmath>

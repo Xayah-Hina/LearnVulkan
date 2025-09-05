@@ -1,0 +1,68 @@
+#version 460
+#extension GL_EXT_nonuniform_qualifier : enable
+
+// 绑定 0：可写 storage image，来自 engine 的 offscreen R16G16B16A16
+layout(set = 0, binding = 0, rgba16f) uniform image2D img;
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 通过 push constants 传入基本参数
+layout(push_constant) uniform Push {
+    uint W;
+    uint H;
+    float margin_px;
+    float gap_px;
+    float base_line_px;
+    float max_value;
+} pc;
+
+// 简单配色
+vec4 background_color() { return vec4(0.08, 0.09, 0.10, 1.0); }
+vec4 axis_color()       { return vec4(0.75, 0.75, 0.78, 1.0); }
+vec4 bar_color(uint i)  {
+    // 根据索引做一个淡变化
+    float t = float(i) / 10.0;
+    return vec4(0.30 + 0.35 * t, 0.45, 0.85 - 0.45 * t, 1.0);
+}
+
+void main()
+{
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= int(pc.W) || p.y >= int(pc.H)) return;
+
+    // 先清背景
+    imageStore(img, p, background_color());
+
+    // 画坐标轴区域底色为背景，另外画一根轴线
+    // 坐标系：左上角为(0,0)，y 向下
+    int axis_y = int(pc.H) - int(pc.base_line_px);
+    if (p.y == axis_y && p.x >= int(pc.margin_px) && p.x < int(pc.W) - int(pc.margin_px)) {
+        imageStore(img, p, axis_color());
+    }
+
+    // 条形图参数
+    const uint N = 11u;           // 0..10
+    float innerW = float(pc.W) - 2.0 * pc.margin_px;
+    float innerH = float(pc.H) - pc.margin_px - pc.base_line_px; // 顶部留白 margin_px
+    float slotW = innerW / float(N); // 每根柱子的槽宽
+    float gap = pc.gap_px;
+    float barW = max(1.0, slotW - gap);
+
+    // 计算当前像素是否在某根柱子内
+    // y 高度映射：值 v 对应高度 h = innerH * (v / max_value)
+    // 我们绘制的值就是 0..10
+    for (uint i = 0u; i < N; ++i) {
+        float v = float(i); // 值
+        float h = innerH * clamp(v / pc.max_value, 0.0, 1.0);
+
+        float x0 = pc.margin_px + float(i) * slotW + gap * 0.5;
+        float x1 = x0 + barW;
+        float y0 = float(axis_y) - h; // 顶端像素 y
+        float y1 = float(axis_y);     // 底端像素 y
+
+        // 屏幕空间内测试
+        if (float(p.x) >= x0 && float(p.x) < x1 && float(p.y) >= y0 && float(p.y) <= y1) {
+            imageStore(img, p, bar_color(i));
+        }
+    }
+}
