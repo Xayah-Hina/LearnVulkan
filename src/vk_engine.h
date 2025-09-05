@@ -10,87 +10,92 @@
 #include <vector>
 #include <functional>
 
-#include "vk_descriptors.h"
+#include "ext/vk_descriptors.h"
 #include "vk_mem_alloc.h"
 
 #include "renderer_iface.h"
 #include "imgui_layer.h"
 
-struct DeletionQueue {
+struct DeletionQueue
+{
     std::vector<std::function<void()>> deleters;
     void push_function(std::function<void()>&& fn) { deleters.emplace_back(std::move(fn)); }
-    void flush() {
+
+    void flush()
+    {
         for (auto it = deleters.rbegin(); it != deleters.rend(); ++it) { (*it)(); }
         deleters.clear();
     }
 };
 
-struct AllocatedImage {
-    VkImage image{};
-    VkImageView imageView{};
-    VmaAllocation allocation{};
-    VkExtent3D imageExtent{};
-    VkFormat imageFormat{};
-};
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
-struct FrameData {
-    VkSemaphore swapchainSemaphore{};
-    VkSemaphore renderSemaphore{};
-    VkFence renderFence{};
-    VkCommandPool commandPool{};
-    VkCommandBuffer mainCommandBuffer{};
-    DeletionQueue deletionQueue;
-};
-
-class VulkanEngine {
-public:
-    VulkanEngine();
-    ~VulkanEngine();
-
+class VulkanEngine
+{
+public: // Main Functions
     void init();
     void run();
     void cleanup();
-
-    // Allow plugging different renderers
     void set_renderer(std::unique_ptr<IRenderer> r) { renderer_ = std::move(r); }
 
-private:
-    // Frame helpers
-    void begin_frame(uint32_t& imageIndex, VkCommandBuffer& cmd);
-    void end_frame(uint32_t imageIndex, VkCommandBuffer cmd);
-
-    // Swapchain (re)creation helpers
-    void create_swapchain(uint32_t width, uint32_t height);
-    void destroy_swapchain();
-    void recreate_swapchain();
-
-private:
-    struct {
+public: // Engine State
+    struct
+    {
         std::string name = "Vulkan Engine";
-        int width  = 1700;
+        int width = 1700;
         int height = 800;
         bool initialized{false};
         bool running{false};
         bool should_rendering{false};
-        int  frame_number{0};
+        int frame_number{0};
         bool resize_requested{false};
-    } STATE;
+    } state_;
 
-    struct EngineContext {
-        SDL_Window* window{nullptr};
-        VkSurfaceKHR surface{};
+public: // Constructors and Operators
+    VulkanEngine() = default;
+    ~VulkanEngine() = default;
+    VulkanEngine(const VulkanEngine&) = delete;
+    VulkanEngine& operator=(const VulkanEngine&) = delete;
+    VulkanEngine(VulkanEngine&&) noexcept = default;
+    VulkanEngine& operator=(VulkanEngine&&) noexcept = default;
+
+private: // Engine Context
+    void create_context(int window_width, int window_height, const char* app_name);
+    void destroy_context();
+
+    struct EngineContext
+    {
         VkInstance instance{};
         VkDebugUtilsMessengerEXT debug_messenger{};
+        SDL_Window* window{nullptr};
+        VkSurfaceKHR surface{};
         VkPhysicalDevice physical{};
         VkDevice device{};
         VkQueue graphics_queue{};
         uint32_t graphics_queue_family{};
         VmaAllocator allocator{};
+        DescriptorAllocator descriptor_allocator;
     } ctx_;
 
-    struct SwapchainSystem {
+private: // Swapchain and Offscreen Drawable
+    void create_swapchain(uint32_t width, uint32_t height);
+    void destroy_swapchain();
+    void recreate_swapchain();
+    void create_offscreen_drawable(uint32_t width, uint32_t height);
+    void destroy_offscreen_drawable();
+
+    struct AllocatedImage
+    {
+        VkImage image{};
+        VkImageView imageView{};
+        VmaAllocation allocation{};
+        VkExtent3D imageExtent{};
+        VkFormat imageFormat{};
+    };
+
+    struct SwapchainSystem
+    {
         VkSwapchainKHR swapchain{};
         VkFormat swapchain_image_format{};
         VkExtent2D swapchain_extent{};
@@ -98,17 +103,34 @@ private:
         std::vector<VkImageView> swapchain_image_views;
         // Engine-offered offscreen target for content
         AllocatedImage drawable_image;
+        AllocatedImage depth_image{};
     } swapchain_;
 
-    FrameData frames_[FRAME_OVERLAP];
+private: // Frame Rendering
+    void create_command_buffers();
+    void destroy_command_buffers();
+    void begin_frame(uint32_t& imageIndex, VkCommandBuffer& cmd);
+    void end_frame(uint32_t imageIndex, VkCommandBuffer cmd);
 
-    DescriptorAllocator globalDescriptorAllocator_;
+    struct FrameData
+    {
+        VkSemaphore swapchainSemaphore{};
+        VkSemaphore renderSemaphore{};
+        VkFence renderFence{};
+        VkCommandPool commandPool{};
+        VkCommandBuffer mainCommandBuffer{};
+        DeletionQueue deletionQueue;
+    } frames_[FRAME_OVERLAP];
 
-    AllocatedImage depth_image_{};
-
+private: // Renderer
+    void create_renderer();
+    void destroy_renderer();
     std::unique_ptr<IRenderer> renderer_;
-    std::unique_ptr<ImGuiLayer> ui_;
 
+private: // ImGui
+    void create_imgui();
+    void destroy_imgui();
+    std::unique_ptr<ImGuiLayer> ui_;
     DeletionQueue mdq_;
 };
 

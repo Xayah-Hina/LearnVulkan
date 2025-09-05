@@ -1,8 +1,8 @@
 #include "renderer_triangle.h"
 
-#include "vk_initializers.h"
-#include "vk_images.h"
-#include "vk_pipelines.h"      // PipelineBuilder
+#include "ext/vk_initializers.h"
+#include "ext/vk_images.h"
+#include "ext/vk_pipelines.h"
 #include <stdexcept>
 
 #ifndef VK_CHECK
@@ -136,5 +136,4 @@ void TriangleRenderer::on_swapchain_resized(const RenderContext& ctx)
 
 void TriangleRenderer::on_imgui()
 {
-    IRenderer::on_imgui();
 }

@@ -1,6 +1,6 @@
 #include "imgui_layer.h"
-#include "vk_initializers.h"   // for vkinit:: helpers if you use them
-#include "vk_images.h"         // for vkutil::transition_image if you use it
+#include "ext/vk_initializers.h"
+#include "ext/vk_images.h"
 
 #include <array>
 

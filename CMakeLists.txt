@@ -13,14 +13,14 @@ include(cmake/setup_vulkan.cmake)
 set(src_files
         src/vk_engine.cpp
         src/vk_engine.h
-        src/vk_initializers.cpp
-        src/vk_initializers.h
-        src/vk_images.cpp
-        src/vk_images.h
-        src/vk_descriptors.cpp
-        src/vk_descriptors.h
-        src/vk_pipelines.cpp
-        src/vk_pipelines.h
+        src/ext/vk_initializers.cpp
+        src/ext/vk_initializers.h
+        src/ext/vk_images.cpp
+        src/ext/vk_images.h
+        src/ext/vk_descriptors.cpp
+        src/ext/vk_descriptors.h
+        src/ext/vk_pipelines.cpp
+        src/ext/vk_pipelines.h
 
         src/renderer_compute_bg.cpp
         src/renderer_compute_bg.h
